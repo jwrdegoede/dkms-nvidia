@@ -3,7 +3,7 @@
 
 Name:           dkms-%{dkms_name}
 Version:        381.22
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        NVIDIA display driver kernel module
 Epoch:          2
 License:        NVIDIA License
@@ -15,6 +15,8 @@ Source0:        %{dkms_name}-kmod-%{version}-i386.tar.xz
 Source1:        %{dkms_name}-kmod-%{version}-x86_64.tar.xz
 Source3:        %{name}-i386.conf
 Source4:        %{name}-x86_64.conf
+# dracut.conf.d file, nvidia modules must never be in the initrd
+Source5:        99-nvidia.conf
 
 Patch0:         kernel_4.11.patch
 
@@ -50,6 +52,13 @@ sed -i -e 's/__VERSION_STRING/%{version}/g' kernel/dkms.conf
 # Create empty tree
 mkdir -p %{buildroot}%{_usrsrc}/%{dkms_name}-%{version}/
 cp -fr kernel/* %{buildroot}%{_usrsrc}/%{dkms_name}-%{version}/
+%if 0%{?rhel} == 6
+mkdir -p %{buildroot}/etc/dracut/dracut.conf.d
+install -p -m 0644 %{SOURCE5} %{buildroot}/etc/dracut/dracut.conf.d
+%else
+mkdir -p %{buildroot}/usr/lib/dracut/dracut.conf.d
+install -p -m 0644 %{SOURCE5} %{buildroot}/usr/lib/dracut/dracut.conf.d
+%endif
 
 %post
 dkms add -m %{dkms_name} -v %{version} -q || :
@@ -62,9 +71,18 @@ dkms install -m %{dkms_name} -v %{version} -q --force || :
 dkms remove -m %{dkms_name} -v %{version} -q --all || :
 
 %files
+%if 0%{?rhel} == 6
+/etc/dracut/dracut.conf.d/99-nvidia.conf
+%else
+/usr/lib/dracut/dracut.conf.d/99-nvidia.conf
+%endif
 %{_usrsrc}/%{dkms_name}-%{version}
 
 %changelog
+* Fri May 12 2017 Hans de Goede <jwrdegoede@fedoraproject.org> - 2:381.22-3
+- Add dracut.conf.d/99-nvidia.conf file enforcing that the nvidia modules never
+  get added to the initramfs (doing so would break things on a driver update)
+
 * Thu May 11 2017 Simone Caronni <negativo17@gmail.com> - 2:381.22-2
 - Add kernel 4.11 patch.
 
